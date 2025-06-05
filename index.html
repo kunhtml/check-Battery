@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiểm tra trạng thái Pin Thiết bị</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #e0f2f7; /* Light blue background */
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            max-width: 550px;
+            width: 100%;
+            text-align: center;
+            transition: all 0.3s ease-in-out;
+        }
+        .container:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            color: #007bff; /* Bright blue heading */
+            margin-bottom: 25px;
+            font-size: 2.2em;
+            font-weight: 600;
+        }
+        p {
+            font-size: 1.15em;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        span.value {
+            font-weight: bold;
+            color: #007bff; /* Match heading color */
+            transition: color 0.3s ease;
+        }
+        #statusMessage {
+            margin-top: 30px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 1.05em;
+            background-color: #f0f8ff; /* Lighter blue for general status */
+            color: #366092;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        .charging-status {
+            color: #ff8c00; /* Darker orange for charging */
+        }
+        .discharging-status {
+            color: #dc3545; /* Red for discharging */
+        }
+        .charged-status {
+            color: #28a745; /* Green for charged */
+        }
+        .error-message {
+            background-color: #f8d7da; /* Light red for errors */
+            color: #721c24; /* Dark red text */
+            border: 1px solid #f5c6cb;
+        }
+        .warning-message {
+            background-color: #fff3cd; /* Light yellow for warnings */
+            color: #856404; /* Dark yellow text */
+            border: 1px solid #ffeeba;
+        }
+        #api-note {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px dashed #ced4da;
+            line-height: 1.5;
+        }
+        #api-note strong {
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Thông tin Pin Thiết bị</h1>
+        <p>Mức pin hiện tại: <span id="batteryLevel" class="value">Đang tải...</span></p>
+        <p>Trạng thái sạc: <span id="batteryCharging" class="value">Đang tải...</span></p>
+        <p id="batteryTimeInfo">Thời gian sử dụng còn lại (ước tính): <span id="batteryTime" class="value">Đang tải...</span></p>
+        <p id="chargeTimeInfo">Thời gian để sạc đầy (ước tính): <span id="chargeTime" class="value">Đang tải...</span></p>
+        
+        <div id="statusMessage">Đang kiểm tra trạng thái pin...</div>
+
+        <p id="api-note">
+            <strong>Lưu ý quan trọng:</strong> Trình duyệt chỉ có thể cung cấp thông tin về **mức pin hiện tại** và **trạng thái sạc**.
+            API này **không thể kiểm tra tổng dung lượng pin tối đa (ví dụ: mAh hoặc Wh)** của thiết bị của bạn vì lý do bảo mật.
+            Để chức năng này hoạt động, bạn cần mở trang này thông qua một máy chủ web (ví dụ: `localhost`) và với giao thức bảo mật **HTTPS** trên các trình duyệt hiện đại như Chrome.
+        </p>
+    </div>
+
+    <script>
+        function formatTime(seconds) {
+            if (seconds === Infinity || seconds === null) {
+                return 'Không xác định';
+            }
+            if (seconds === 0) {
+                return 'Đã sạc đầy hoặc nguồn điện đã ngắt';
+            }
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const remainingMinutes = minutes % 60;
+            return `${hours} giờ ${remainingMinutes} phút`;
+        }
+
+        function updateBatteryStatus(battery) {
+            const batteryLevel = document.getElementById('batteryLevel');
+            const batteryCharging = document.getElementById('batteryCharging');
+            const batteryTime = document.getElementById('batteryTime');
+            const chargeTime = document.getElementById('chargeTime');
+            const statusMessage = document.getElementById('statusMessage');
+            const batteryTimeInfo = document.getElementById('batteryTimeInfo');
+            const chargeTimeInfo = document.getElementById('chargeTimeInfo');
+
+            // Mức pin
+            const level = (battery.level * 100).toFixed(0); // Làm tròn không lấy số thập phân
+            batteryLevel.textContent = `${level}%`;
+            batteryLevel.style.color = level < 20 ? '#dc3545' : level < 50 ? '#ff8c00' : '#28a745';
+
+            // Trạng thái sạc
+            if (battery.charging) {
+                batteryCharging.textContent = 'Có';
+                batteryCharging.className = 'value charging-status';
+                chargeTimeInfo.style.display = 'block';
+                batteryTimeInfo.style.display = 'none'; // Ẩn thời gian còn lại khi đang sạc
+            } else {
+                batteryCharging.textContent = 'Không';
+                batteryCharging.className = 'value discharging-status';
+                chargeTimeInfo.style.display = 'none'; // Ẩn thời gian sạc đầy khi không sạc
+                batteryTimeInfo.style.display = 'block';
+            }
+            
+            // Thời gian còn lại (nếu không sạc)
+            batteryTime.textContent = formatTime(battery.dischargingTime);
+
+            // Thời gian để sạc đầy (nếu đang sạc)
+            chargeTime.textContent = formatTime(battery.chargingTime);
+            
+            // Cập nhật thông báo trạng thái tổng quát
+            if (battery.charging) {
+                if (battery.level === 1) {
+                    statusMessage.textContent = 'Pin đã sạc đầy! Bạn có thể ngắt kết nối sạc.';
+                    statusMessage.className = 'charged-status';
+                } else {
+                    statusMessage.textContent = 'Thiết bị đang được sạc. Pin đang nạp năng lượng.';
+                    statusMessage.className = 'charging-status';
+                }
+            } else {
+                if (battery.level < 0.15) { // Dưới 15%
+                    statusMessage.textContent = 'Pin yếu! Vui lòng sạc thiết bị ngay lập tức.';
+                    statusMessage.className = 'discharging-status error-message';
+                } else if (battery.level < 0.4) { // Dưới 40%
+                    statusMessage.textContent = 'Pin đang ở mức trung bình. Cân nhắc sạc pin.';
+                    statusMessage.className = 'discharging-status warning-message';
+                } else {
+                    statusMessage.textContent = 'Thiết bị đang sử dụng pin. Mức pin ổn định.';
+                    statusMessage.className = 'discharging-status';
+                }
+            }
+            statusMessage.style.display = 'block'; // Đảm bảo thông báo luôn hiển thị khi có dữ liệu
+        }
+
+        // Lấy thông tin pin khi tải trang
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusMessage = document.getElementById('statusMessage');
+            const batteryLevel = document.getElementById('batteryLevel');
+            const batteryCharging = document.getElementById('batteryCharging');
+            const batteryTime = document.getElementById('batteryTime');
+            const chargeTime = document.getElementById('chargeTime');
+            const batteryTimeInfo = document.getElementById('batteryTimeInfo');
+            const chargeTimeInfo = document.getElementById('chargeTimeInfo');
+
+            if ('getBattery' in navigator) {
+                navigator.getBattery().then(function(battery) {
+                    updateBatteryStatus(battery); // Cập nhật lần đầu
+
+                    // Lắng nghe sự kiện thay đổi trạng thái pin
+                    battery.addEventListener('levelchange', () => updateBatteryStatus(battery));
+                    battery.addEventListener('chargingchange', () => updateBatteryStatus(battery));
+                    battery.addEventListener('dischargingtimechange', () => updateBatteryStatus(battery));
+                    battery.addEventListener('chargingtimechange', () => updateBatteryStatus(battery));
+                }).catch(function(error) {
+                    // Xử lý lỗi khi không truy cập được API
+                    statusMessage.textContent = `Lỗi khi truy cập thông tin pin: ${error.message}. Vui lòng đảm bảo bạn đang chạy trang trên máy chủ web (ví dụ: localhost) và có HTTPS.`;
+                    statusMessage.className = 'error-message';
+                    statusMessage.style.display = 'block';
+                    batteryLevel.textContent = 'Không khả dụng';
+                    batteryCharging.textContent = 'Không khả dụng';
+                    batteryTime.textContent = 'Không khả dụng';
+                    chargeTime.textContent = 'Không khả dụng';
+                    batteryTimeInfo.style.display = 'block';
+                    chargeTimeInfo.style.display = 'block'; // Hiển thị cả 2 để thông báo lỗi
+                    console.error("Lỗi Battery API:", error);
+                });
+            } else {
+                // Xử lý khi trình duyệt không hỗ trợ API
+                statusMessage.textContent = 'Trình duyệt của bạn không hỗ trợ Battery Status API.';
+                statusMessage.className = 'error-message';
+                statusMessage.style.display = 'block';
+                batteryLevel.textContent = 'Không hỗ trợ';
+                batteryCharging.textContent = 'Không hỗ trợ';
+                batteryTime.textContent = 'Không hỗ trợ';
+                chargeTime.textContent = 'Không hỗ trợ';
+                batteryTimeInfo.style.display = 'block';
+                chargeTimeInfo.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
